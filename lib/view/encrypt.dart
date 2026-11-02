@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'package:encrypt/encrypt.dart';
 
 class WorldlineEncryption {
-  // static const String keyString = 'X5mUl3J1jneCd0adISoHWDTj7U8Rnhvd';
-  static const String keyString = '0vHXVAke4JDi6xhvPPOk1kk5szKBueh6';
+   static const String keyString = 'X5mUl3J1jneCd0adISoHWDTj7U8Rnhvd';
+  //static const String keyString = '0vHXVAke4JDi6xhvPPOk1kk5szKBueh6';
 
-   //static const String ivString = '1111111245683783';
-  static const String ivString = 'ccvObLkKrnYNUHyw';
+   static const String ivString = '1111111245683783';
+  //static const String ivString = 'ccvObLkKrnYNUHyw';
 
   static String encryptRequest(Map<String, dynamic> request) {
     final key = Key.fromUtf8(keyString);

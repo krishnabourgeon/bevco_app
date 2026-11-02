@@ -18,6 +18,10 @@ class MainActivity : FlutterActivity() {
             null
         }
 
+        // Masung thermal printer, used by PrinterService in lib/print_service.dart.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "masung_printer")
+            .setMethodCallHandler(PrinterPlugin(this))
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "punnyam_kiosk_kadampuzha/beep")
             .setMethodCallHandler { call, result ->
                 when (call.method) {

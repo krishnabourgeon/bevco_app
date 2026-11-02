@@ -1465,13 +1465,32 @@ class _PreviewScreenState extends State<PreviewScreen> {
     );
   }
 
+  // Future<String> checkStatus(String urn, String tid) async {
+  //   final body = {"urn": urn, "tid": tid};
+  //   print("Original Request: $body");
+  //   final encryptedData = WorldlineEncryption.encryptRequest(body);
+
+  //   final response = await http.post(
+  //     Uri.parse('https://lb.mrlpay.com/pcpos4/StatusCheck.php?source=941'),
+  //     headers: {'Content-Type': 'application/json'},
+  //     body: encryptedData,
+  //   );
+  //   final jsonResponse = jsonDecode(response.body);
+  //   final encrypted = jsonResponse['data'];
+  //   final decrypt = WorldlineEncryption.decryptResponse(encrypted);
+
+  //   final data = jsonDecode(decrypt);
+  //   return data['status'];
+  // }
+
+
   Future<String> checkStatus(String urn, String tid) async {
     final body = {"urn": urn, "tid": tid};
     print("Original Request: $body");
     final encryptedData = WorldlineEncryption.encryptRequest(body);
 
     final response = await http.post(
-      Uri.parse('https://lb.mrlpay.com/pcpos4/StatusCheck.php?source=941'),
+      Uri.parse('https://bouat.mrlpay.com/pcpos4/StatusCheck.php?source=629'),
       headers: {'Content-Type': 'application/json'},
       body: encryptedData,
     );
@@ -1501,9 +1520,46 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
   }
 
-  saleTransaction(String? amt, String? mode) async {
+  // saleTransaction(String? amt, String? mode) async {
+  //   final request = {
+  //     "tid": "3419965A",
+  //     "amount": amt,
+  //     "organization_code": "Retail",
+  //     "invoiceNumber": "",
+  //     "rrn": "",
+  //     "type": mode == "CARD" ? "SALE" : "SALE-UPI",
+  //     "cb_amt": "",
+  //     "app_code": "",
+  //     "tokenisedValue": "",
+  //     "actionId": mode == "CARD" ? "1" : "133",
+  //     "request_urn": "",
+  //   };
+  //   print("Original Request: $request");
+
+  //   final encryptedData = WorldlineEncryption.encryptRequest(request);
+
+  //   final response = await http.post(
+  //     Uri.parse(
+  //       'https://lb.mrlpay.com/pcpos4/TransactionRequest.php?source=941',
+  //     ),
+  //     headers: {'Content-Type': 'application/json'},
+  //     body: encryptedData,
+  //   );
+
+  //   final jsonResponse = jsonDecode(response.body);
+
+  //   final encrypted = jsonResponse['data'];
+  //   final decrypt = WorldlineEncryption.decryptResponse(encrypted);
+  //   print("decrypt json: $decrypt");
+  //   final data = jsonDecode(decrypt);
+  //   final String urn = data['urn'];
+  //   final String tid = data['tid'];
+  //   return await waitForPaymentStatus(urn, tid);
+  // }
+
+   saleTransaction(String? amt, String? mode) async {
     final request = {
-      "tid": "3419965A",
+      "tid": "2462204U",
       "amount": amt,
       "organization_code": "Retail",
       "invoiceNumber": "",
@@ -1521,7 +1577,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
     final response = await http.post(
       Uri.parse(
-        'https://lb.mrlpay.com/pcpos4/TransactionRequest.php?source=941',
+        'https://bouat.mrlpay.com/pcpos4/TransactionRequest.php?source=629',
       ),
       headers: {'Content-Type': 'application/json'},
       body: encryptedData,
@@ -1532,6 +1588,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
     final encrypted = jsonResponse['data'];
     final decrypt = WorldlineEncryption.decryptResponse(encrypted);
     print("decrypt json: $decrypt");
+    // if (decrypt == null || decrypt.startsWith("Error")) {
+    //   print("Decryption failed: $decrypt");
+    //   isEnabled.value = false;
+    //   Helpers.successToast("Payment failed. Please try again.");
+    //   return;
+    // }
     final data = jsonDecode(decrypt);
     final String urn = data['urn'];
     final String tid = data['tid'];
@@ -1745,6 +1807,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
         mode: home.saveBillResponse?.summary?.mode?.toString(),
         total: home.saveBillResponse?.summary?.total?.toString(),
         website: templeData?.website ?? '',
+        billImage: home.saveBillResponse?.billimage,
         items: home.pooja.map((p) => {
               "deity": p.diety,
               "pooja": p.pooja,
@@ -2366,87 +2429,88 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
 
                                       onTap: () async {
-  if (isEnabled.value) return;
-  isEnabled.value = true;
+                                        if (isEnabled.value) return;
+                                        isEnabled.value = true;
 
-  // 1) Save the bill first so a printer problem can never block it.
-  await home.saveBill(
-    transid: "BEVCO",
-    paymentMode: 4,
-    onSuccess: () async {
-      Helpers.successToast(
-        home.saveBillResponse?.message ?? 'Bill Saved',
-      );
+                                        // 1) Save the bill first so a printer problem can never block it.
+                                        await home.saveBill(
+                                          transid: "BEVCO",
+                                          paymentMode: 4,
+                                          onSuccess: () async {
+                                            Helpers.successToast(
+                                              home.saveBillResponse?.message ?? 'Bill Saved',
+                                            );
 
-      // 2) Print. Any failure here is non-fatal because the bill is already saved.
-      try {
-        final connected = await PrinterService.connect();
+                                            // 2) Print. Any failure here is non-fatal because the bill is already saved.
+                                            try {
+                                              final connected = await PrinterService.connect();
 
-        if (connected) {
-          final templeData = home.saveBillResponse?.temple;
+                                              if (connected) {
+                                                final templeData = home.saveBillResponse?.temple;
 
-          final templeName =
-              widget.lanid != 1 &&
-                      (templeData?.nameMal?.isNotEmpty ?? false)
-                  ? templeData!.nameMal
-                  : templeData?.name;
+                                                final templeName =
+                                                    widget.lanid != 1 &&
+                                                            (templeData?.nameMal?.isNotEmpty ?? false)
+                                                        ? templeData!.nameMal
+                                                        : templeData?.name;
 
-          final billDate = home.saveBillResponse?.summary?.billDate;
-          final formatted = (billDate != null && billDate.isNotEmpty)
-              ? DateFormat('dd-MM-yyyy HH:mm:ss')
-                  .format(DateTime.parse(billDate))
-              : DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now());
+                                                final billDate = home.saveBillResponse?.summary?.billDate;
+                                                final formatted = (billDate != null && billDate.isNotEmpty)
+                                                    ? DateFormat('dd-MM-yyyy HH:mm:ss')
+                                                        .format(DateTime.parse(billDate))
+                                                    : DateFormat('dd-MM-yyyy HH:mm:ss').format(DateTime.now());
 
-          await PrinterService.printReceipt(
-            temple: templeName,
-            templeAddress: templeData?.addressLine1 ?? '',
-            templePlace: templeData?.addressLine2 ?? '',
-            today: formatted,
-            id: home.saveBillResponse?.summary?.id,
-            mode: home.saveBillResponse?.summary?.mode?.toString(),
-            total: home.saveBillResponse?.summary?.total?.toString(),
-            website: templeData?.website ?? '',
-            items: home.pooja.map((p) => {
-                  "deity": p.diety,
-                  "pooja": p.pooja,
-                  "qty": p.qty,
-                  "rate": p.rate,
-                  "date": p.date,
-                  "address": p.address,
-                }).toList(),
-          );
-        } else {
-          Helpers.successToast(
-            "Failed to connect to printer. Bill saved but printing failed.",
-          );
-        }
-      } catch (e, st) {
-        debugPrint("Print error: $e");
-        debugPrintStack(stackTrace: st);
-        Helpers.successToast("Bill saved, but printing failed");
-      }
+                                                await PrinterService.printReceipt(
+                                                  temple: templeName,
+                                                  templeAddress: templeData?.addressLine1 ?? '',
+                                                  templePlace: templeData?.addressLine2 ?? '',
+                                                  today: formatted,
+                                                  id: home.saveBillResponse?.summary?.id,
+                                                  mode: home.saveBillResponse?.summary?.mode?.toString(),
+                                                  total: home.saveBillResponse?.summary?.total?.toString(),
+                                                  website: templeData?.website ?? '',
+                                                  billImage: home.saveBillResponse?.billimage,
+                                                  items: home.pooja.map((p) => {
+                                                        "deity": p.diety,
+                                                        "pooja": p.pooja,
+                                                        "qty": p.qty,
+                                                        "rate": p.rate,
+                                                        "date": p.date,
+                                                        "address": p.address,
+                                                      }).toList(),
+                                                );
+                                              } else {
+                                                Helpers.successToast(
+                                                  "Failed to connect to printer. Bill saved but printing failed.",
+                                                );
+                                              }
+                                            } catch (e, st) {
+                                              debugPrint("Print error: $e");
+                                              debugPrintStack(stackTrace: st);
+                                              Helpers.successToast("Bill saved, but printing failed");
+                                            }
 
-      isEnabled.value = false;
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => MyHomePage()),
-          (route) => false,
-        );
-      }
-    },
-    onFailure: () async {
-      isEnabled.value = false;
-      Helpers.successToast("Bill saving failed");
-    },
-  );
+                                            isEnabled.value = false;
+                                            if (mounted) {
+                                              Navigator.pushAndRemoveUntil(
+                                                context,
+                                                MaterialPageRoute(builder: (context) => MyHomePage()),
+                                                (route) => false,
+                                              );
+                                            }
+                                          },
+                                          onFailure: () async {
+                                            isEnabled.value = false;
+                                            Helpers.successToast("Bill saving failed");
+                                          },
+                                        );
 
-  // saveBill returns without calling any callback when the device is offline.
-  // Without this, the button would stay stuck on the loader.
-  if (isEnabled.value && !home.successave && home.saveBillResponse == null) {
-    isEnabled.value = false;
-  }
-},
+                                        // saveBill returns without calling any callback when the device is offline.
+                                        // Without this, the button would stay stuck on the loader.
+                                        if (isEnabled.value && !home.successave && home.saveBillResponse == null) {
+                                          isEnabled.value = false;
+                                        }
+                                      },
                                       
                                       child: Container(
                                         decoration: BoxDecoration(

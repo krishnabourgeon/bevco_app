@@ -2,9 +2,11 @@ package com.example.punnyam_kiosk_kadampuzha
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
 import android.hardware.usb.UsbManager
 import android.text.Layout
 import android.text.StaticLayout
@@ -41,16 +43,16 @@ class PrinterPlugin(
         return text.any { it.code in 0x0D00..0x0D7F }
     }
 
-    private fun printLine(text: String) {
+    private fun printLine(text: String, center: Boolean = false) {
         if (text.isEmpty()) return
         if (containsMalayalam(text)) {
-            printTextAsBitmap(text)
+            printTextAsBitmap(text, center)
         } else {
             usbDriver?.write(PrintCmd.PrintString(text, 0))
         }
     }
 
-    private fun printTextAsBitmap(text: String) {
+    private fun printTextAsBitmap(text: String, center: Boolean = false) {
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.BLACK
             textSize = 24f
@@ -63,11 +65,13 @@ class PrinterPlugin(
         val maxLineWidthPx = 256
         val padding = 10
 
+        // Text width excludes the padding on both sides so wrapped lines are
+        // not clipped at the right edge, and centred text lands mid-bitmap.
         val layout = StaticLayout(
             text,
             paint,
-            maxLineWidthPx,
-            Layout.Alignment.ALIGN_NORMAL,
+            maxLineWidthPx - padding * 2,
+            if (center) Layout.Alignment.ALIGN_CENTER else Layout.Alignment.ALIGN_NORMAL,
             1f,
             0f,
             false
@@ -93,6 +97,43 @@ class PrinterPlugin(
             )
             // Fall back to the GB2312 path (renders as '?') rather than dropping the line silently.
             usbDriver?.write(PrintCmd.PrintString(text, 0))
+        }
+        bitmap.recycle()
+    }
+
+    // Prints the bill_image sent from Dart as encoded PNG/JPG bytes.
+    private fun printImage(imageBytes: ByteArray?) {
+        if (imageBytes == null || imageBytes.isEmpty()) return
+
+        val source = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+        if (source == null) {
+            Log.e("PrinterPlugin", "Bill image could not be decoded (${imageBytes.size} bytes)")
+            return
+        }
+
+        // Same 256-dot limit as printTextAsBitmap - wider images make the
+        // native PrintBitmap() fail. Height keeps the aspect ratio.
+        val printWidth = 256
+        val printHeight = (source.height * printWidth.toFloat() / source.width)
+            .toInt().coerceAtLeast(1)
+
+        // Draw onto white so transparent PNG areas don't print as black.
+        val bitmap = Bitmap.createBitmap(printWidth, printHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.WHITE)
+        canvas.drawBitmap(
+            source,
+            null,
+            Rect(0, 0, printWidth, printHeight),
+            Paint(Paint.FILTER_BITMAP_FLAG)
+        )
+        source.recycle()
+
+        val bytes = PrintCmd.PrintBitmap(bitmap)
+        if (bytes != null) {
+            usbDriver?.write(bytes)
+        } else {
+            Log.e("PrinterPlugin", "PrintBitmap failed for bill image (${printWidth}x$printHeight)")
         }
         bitmap.recycle()
     }
@@ -162,6 +203,8 @@ val templePlace =  call.argument<String>("templePlace") ?: ""
 
                 val website =
                     call.argument<String>("website") ?: ""
+                val billImage =
+                    call.argument<ByteArray>("billImage")
                 val items =call.argument<List<Map<String, Any?>>>("items")
         ?: emptyList()
 
@@ -174,6 +217,7 @@ val templePlace =  call.argument<String>("templePlace") ?: ""
                     mode,
                     total,
                     website,
+                    billImage,
                     items
                 )
 
@@ -210,30 +254,36 @@ val templePlace =  call.argument<String>("templePlace") ?: ""
     mode: String,
     total: String,
     website: String,
+    billImage: ByteArray?,
     items: List<Map<String, Any?>>
 ) {
 
   usbDriver?.write(PrintCmd.SetClean())
 
-printLine(temple.uppercase())
-printLine(templeAddress)
-printLine(templePlace)
+// Logo and temple header are centred; everything below is left-aligned.
+usbDriver?.write(PrintCmd.SetAlignment(1))
+
+printImage(billImage)
+
+printLine(temple.uppercase(), center = true)
+printLine(templeAddress, center = true)
+printLine(templePlace, center = true)
+
+usbDriver?.write(PrintCmd.SetAlignment(0))
 
 usbDriver?.write(PrintCmd.PrintFeedline(1))
 
 printLine("--------------------------------")
 
-    printTwoColumn(
-        "Bill No: $billNo",
-        date
-    )
+    // Bill number in bold, date on the next line - together they don't fit in 32 chars.
+    usbDriver?.write(PrintCmd.SetBold(1))
+    printLine("Bill No: $billNo")
+    usbDriver?.write(PrintCmd.SetBold(0))
+    printLine(date)
 
     printLine("--------------------------------")
 
     for (item in items) {
-
-        val deity =
-            item["deity"]?.toString() ?: ""
 
         val pooja =
             item["pooja"]?.toString() ?: ""
@@ -249,11 +299,6 @@ printLine("--------------------------------")
 
         val address =
             item["address"]?.toString() ?: ""
-
-        // Print deity name only
-        if (deity.isNotEmpty()) {
-            printLine(deity)
-        }
 
         // Print pooja name, quantity and rate
         if (pooja.isNotEmpty()) {
@@ -281,13 +326,7 @@ printLine("--------------------------------")
     )
 
     usbDriver?.write(
-        PrintCmd.PrintFeedline(1)
-    )
-
-    printLine("Book Online $website")
-
-    usbDriver?.write(
-        PrintCmd.PrintFeedline(3)
+        PrintCmd.PrintFeedline(4)
     )
 
     usbDriver?.write(
