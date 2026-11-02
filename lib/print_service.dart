@@ -52,6 +52,12 @@ class PrinterService {
   // main thread the plugin runs on. Any failure returns null so the receipt
   // still prints without the image.
   static Future<Uint8List?> _loadImageBytes(String? image) async {
+    final bytes = await _resolveImageBytes(image);
+    debugPrint("Bill image: value=$image, bytes=${bytes?.length ?? 0}");
+    return bytes;
+  }
+
+  static Future<Uint8List?> _resolveImageBytes(String? image) async {
     if (image == null || image.trim().isEmpty) return null;
     final value = image.trim();
     try {

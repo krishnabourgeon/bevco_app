@@ -478,9 +478,6 @@
 // //   );
 // // }
 
-
-
-
 // import 'dart:async';
 // import 'package:flutter/material.dart';
 // import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -818,7 +815,7 @@
 //             fontSize: 30.sp,
 //             fontWeight: FontWeight.w500,
 //             color: Colors.white.withOpacity(0.7),
-//           ), 
+//           ),
 //         ),
 //         6.verticalSpace,
 //         Text(
@@ -850,7 +847,6 @@
 //     stops: [0.0, 0.45, 0.55, 1.0],
 //   );
 
- 
 // Widget _rowButton({
 //   required String label,
 //   required IconData icon,
@@ -966,9 +962,6 @@
 //     ),
 //   );
 // }
-
-
-
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -1134,70 +1127,69 @@ class _MyHomePageState extends State<MyHomePage>
   //   });
   // }
 
-
   void _showCounters() {
-  Future.microtask(() async {
-    if (!mounted) return;
+    Future.microtask(() async {
+      if (!mounted) return;
 
-    final provider = context.read<HomeProvider>();
+      final provider = context.read<HomeProvider>();
 
-    // Fetch counters from API first
-    await provider.getCounter();
+      // Fetch counters from API first
+      await provider.getCounter();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    debugPrint("Counter Names: ${provider.counterName}");
-    debugPrint("Counter IDs: ${provider.counterId}");
+      debugPrint("Counter Names: ${provider.counterName}");
+      debugPrint("Counter IDs: ${provider.counterId}");
 
-    if (provider.counterName.isEmpty) {
-      Helpers.successToast("No counters available");
-      return;
-    }
+      if (provider.counterName.isEmpty) {
+        Helpers.successToast("No counters available");
+        return;
+      }
 
-    // Reset selection
-    _chosenValue = null;
-    selectedCounterID = null;
+      // Reset selection
+      _chosenValue = null;
+      selectedCounterID = null;
 
-    showDialog(
-      barrierDismissible: false,
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return PopScope(
-              canPop: false,
-              child: AlertDialog(
-                title: Text(
-                  "Choose Counter",
-                  style: Fontpalette.blackinter45400,
-                ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Please select a counter.",
-                      style: Fontpalette.blackinter40400,
-                    ),
-                    const SizedBox(height: 15),
-
-                    DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      value: _chosenValue,
-                      hint: Text(
-                        "Select Counter",
-                        style: Fontpalette.blackinter28400,
+      showDialog(
+        barrierDismissible: false,
+        context: context,
+        builder: (dialogContext) {
+          return StatefulBuilder(
+            builder: (dialogContext, setDialogState) {
+              return PopScope(
+                canPop: false,
+                child: AlertDialog(
+                  title: Text(
+                    "Choose Counter",
+                    style: Fontpalette.blackinter45400,
+                  ),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Please select a counter.",
+                        style: Fontpalette.blackinter40400,
                       ),
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
+                      const SizedBox(height: 15),
+
+                      DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        value: _chosenValue,
+                        hint: Text(
+                          "Select Counter",
+                          style: Fontpalette.blackinter28400,
                         ),
-                      ),
-                      items: List.generate(
-                        provider.counterName.length,
-                        (index) {
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        items: List.generate(provider.counterName.length, (
+                          index,
+                        ) {
                           return DropdownMenuItem<String>(
                             value: provider.counterName[index],
                             child: Text(
@@ -1205,66 +1197,61 @@ class _MyHomePageState extends State<MyHomePage>
                               style: Fontpalette.blackinter30600,
                             ),
                           );
+                        }),
+                        onChanged: (value) {
+                          setDialogState(() {
+                            _chosenValue = value;
+
+                            final index = provider.counterName.indexOf(value!);
+
+                            if (index != -1) {
+                              selectedCounterID = provider.counterId[index];
+                            }
+                          });
                         },
                       ),
-                      onChanged: (value) {
-                        setDialogState(() {
-                          _chosenValue = value;
 
-                          final index =
-                              provider.counterName.indexOf(value!);
+                      const SizedBox(height: 20),
 
-                          if (index != -1) {
-                            selectedCounterID =
-                                provider.counterId[index];
-                          }
-                        });
-                      },
-                    ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () async {
+                              if (selectedCounterID == null) {
+                                Helpers.successToast("Please select a counter");
+                                return;
+                              }
 
-                    const SizedBox(height: 20),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () async {
-                            if (selectedCounterID == null) {
-                              Helpers.successToast(
-                                "Please select a counter",
+                              await SharedPreferenceHelper.saveCounterID(
+                                selectedCounterID!,
                               );
-                              return;
-                            }
 
-                            await SharedPreferenceHelper.saveCounterID(
-                              selectedCounterID!,
-                            );
+                              if (dialogContext.mounted) {
+                                Navigator.pop(dialogContext);
+                              }
 
-                            if (dialogContext.mounted) {
-                              Navigator.pop(dialogContext);
-                            }
-
-                            debugPrint(
-                              "Selected Counter ID: $selectedCounterID",
-                            );
-                          },
-                          child: Text(
-                            "SAVE",
-                            style: Fontpalette.blackinter42700,
+                              debugPrint(
+                                "Selected Counter ID: $selectedCounterID",
+                              );
+                            },
+                            child: Text(
+                              "SAVE",
+                              style: Fontpalette.blackinter42700,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  });
-}
+              );
+            },
+          );
+        },
+      );
+    });
+  }
 
   void _logout() {
     SharedPreferenceHelper.clearWholeData();
@@ -1276,10 +1263,7 @@ class _MyHomePageState extends State<MyHomePage>
   }
 
   void _onScanTap() {
-    navigatescrren(
-      context: context,
-      page: BillScreen(),
-    );
+    navigatescrren(context: context, page: BillScreen());
   }
 
   @override
@@ -1368,7 +1352,7 @@ class _MyHomePageState extends State<MyHomePage>
                           _scanButton(),
                           const Spacer(),
                           30.verticalSpace,
-                          _buildBottom(),
+                          //_buildBottom(),
                         ],
                       ).horizontalPadding(120.w),
                     ),

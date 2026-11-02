@@ -117,6 +117,50 @@ class HomeProvider extends ProviderHelperClass with ChangeNotifier {
     notifyListeners();
   }
 
+  // Changes the qty of the entry at [index] by [delta] (+1 / -1) and
+  // refreshes the preview. Qty never drops below 1 here - the Remove button
+  // takes the line out completely.
+  changePoojaQty({required int index, required int delta}) async {
+    if (index < 0 || index >= pooja.length) return;
+    final newQty = (pooja[index].qty ?? 1) + delta;
+    if (newQty < 1) return;
+    updateRemovepoojaLoaderState(LoaderState.loading);
+    notifyListeners();
+    pooja[index].qty = newQty;
+    grossamount = getGrossAmount(pooja);
+    await getPreviewBill();
+    updateRemovepoojaLoaderState(LoaderState.loaded);
+    notifyListeners();
+  }
+
+  // The same product scanned several times becomes one line with the qty
+  // summed. Muttarukkal/Coconut are left alone because they are paired by
+  // position (see removeMuttarukkalGroup).
+  void mergeDuplicatePooja() {
+    final merged = <PoojaDetails>[];
+    final byKey = <String, PoojaDetails>{};
+    for (final item in pooja) {
+      if (item.poojaId == muttarukkalPoojaId ||
+          item.poojaId == coconutPoojaId) {
+        merged.add(item);
+        continue;
+      }
+      final key =
+          "${item.poojaId}|${item.rate}|${item.name}|${item.starId}|${item.date}";
+      final existing = byKey[key];
+      if (existing == null) {
+        byKey[key] = item;
+        merged.add(item);
+      } else {
+        existing.qty = (existing.qty ?? 1) + (item.qty ?? 1);
+      }
+    }
+    pooja
+      ..clear()
+      ..addAll(merged);
+    grossamount = getGrossAmount(pooja);
+  }
+
   // Muttarukkal and its Coconut line are added together as one unit,
   // immediately adjacent in the list (see MuttarukkalBookingScreen._addEntry)
   // — removing the Muttarukkal entry at [index] should take only its own
@@ -555,6 +599,7 @@ Future<void> getCounter() async {
     Function? onSuccess,
     Function? onFailure,
   }) async {
+    mergeDuplicatePooja();
     final network = await CommonFunctions.checkInternetConnection();
     if (network) {
       try {

@@ -43,19 +43,19 @@ class PrinterPlugin(
         return text.any { it.code in 0x0D00..0x0D7F }
     }
 
-    private fun printLine(text: String, center: Boolean = false) {
+    private fun printLine(text: String, center: Boolean = false, textSize: Float = 24f) {
         if (text.isEmpty()) return
         if (containsMalayalam(text)) {
-            printTextAsBitmap(text, center)
+            printTextAsBitmap(text, center, textSize)
         } else {
             usbDriver?.write(PrintCmd.PrintString(text, 0))
         }
     }
 
-    private fun printTextAsBitmap(text: String, center: Boolean = false) {
+    private fun printTextAsBitmap(text: String, center: Boolean = false, textSize: Float = 24f) {
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.BLACK
-            textSize = 24f
+            this.textSize = textSize
         }
 
         // Must match the printer's actual dot width (same width the 32-char
@@ -103,13 +103,17 @@ class PrinterPlugin(
 
     // Prints the bill_image sent from Dart as encoded PNG/JPG bytes.
     private fun printImage(imageBytes: ByteArray?) {
-        if (imageBytes == null || imageBytes.isEmpty()) return
+        if (imageBytes == null || imageBytes.isEmpty()) {
+            Log.w("PrinterPlugin", "No bill image received, printing receipt without it")
+            return
+        }
 
         val source = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
         if (source == null) {
             Log.e("PrinterPlugin", "Bill image could not be decoded (${imageBytes.size} bytes)")
             return
         }
+        Log.d("PrinterPlugin", "Bill image decoded: ${source.width}x${source.height}")
 
         // Same 256-dot limit as printTextAsBitmap - wider images make the
         // native PrintBitmap() fail. Height keeps the aspect ratio.
@@ -131,7 +135,11 @@ class PrinterPlugin(
 
         val bytes = PrintCmd.PrintBitmap(bitmap)
         if (bytes != null) {
-            usbDriver?.write(bytes)
+            val written = usbDriver?.write(bytes)
+            Log.d(
+                "PrinterPlugin",
+                "Bill image sent to printer (${printWidth}x$printHeight, ${bytes.size} bytes, written=$written)"
+            )
         } else {
             Log.e("PrinterPlugin", "PrintBitmap failed for bill image (${printWidth}x$printHeight)")
         }
@@ -228,110 +236,111 @@ val templePlace =  call.argument<String>("templePlace") ?: ""
         }
     }
 
+    // Characters per line in the normal 12x24 font. 48 fits 80mm paper
+    // (576 dots); use 32 for 58mm paper.
+    private val lineChars = 48
+
+    private fun divider() = printLine("-".repeat(lineChars))
+
     private fun printTwoColumn(
         left: String,
         right: String
     ) {
+        val spaces = (lineChars - left.length - right.length).coerceAtLeast(1)
+        printLine(left + " ".repeat(spaces) + right)
+    }
 
-        val width = 32
+    // Same as printTwoColumn, with the left text in bold.
+    private fun printTwoColumnBoldLeft(left: String, right: String) {
+        val spaces = (lineChars - left.length - right.length).coerceAtLeast(1)
+        usbDriver?.write(PrintCmd.SetBold(1))
+        usbDriver?.write(PrintCmd.PrintString(left, 1))
+        usbDriver?.write(PrintCmd.SetBold(0))
+        usbDriver?.write(PrintCmd.PrintString(" ".repeat(spaces) + right, 0))
+    }
 
-        val spaces =
-            (width - left.length - right.length)
-                .coerceAtLeast(1)
+    // Address fields from the API contain \r\n line breaks and stray spaces;
+    // print each part on its own centred line.
+    private fun printCentredLines(text: String) {
+        text.split("\r\n", "\n", "\r")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .forEach { printLine(it, center = true) }
+    }
 
-        val line =
-            left + " ".repeat(spaces) + right
+    // 240.0 -> "240", 12.5 -> "12.50"
+    private fun formatAmount(value: Any?): String {
+        val number = value?.toString()?.toDoubleOrNull() ?: return value?.toString() ?: ""
+        return if (number % 1.0 == 0.0) number.toLong().toString() else String.format("%.2f", number)
+    }
 
-        printLine(line)
+    // Total always shows two decimals: 2370 -> "2370.00"
+    private fun formatTotal(value: Any?): String {
+        val number = value?.toString()?.toDoubleOrNull() ?: return value?.toString() ?: ""
+        return String.format(java.util.Locale.US, "%.2f", number)
     }
 
     private fun printReceipt(
         temple: String,
-    templeAddress: String,
-    templePlace: String,
-    billNo: String,
-    date: String,
-    mode: String,
-    total: String,
-    website: String,
-    billImage: ByteArray?,
-    items: List<Map<String, Any?>>
-) {
+        templeAddress: String,
+        templePlace: String,
+        billNo: String,
+        date: String,
+        mode: String,
+        total: String,
+        website: String,
+        billImage: ByteArray?,
+        items: List<Map<String, Any?>>
+    ) {
 
-  usbDriver?.write(PrintCmd.SetClean())
+        usbDriver?.write(PrintCmd.SetClean())
 
-// Logo and temple header are centred; everything below is left-aligned.
-usbDriver?.write(PrintCmd.SetAlignment(1))
+        // Logo and temple header are centred; everything below is left-aligned.
+        usbDriver?.write(PrintCmd.SetAlignment(1))
 
-printImage(billImage)
+        printImage(billImage)
 
-printLine(temple.uppercase(), center = true)
-printLine(templeAddress, center = true)
-printLine(templePlace, center = true)
+        // Temple name in the smaller font: 9x17 printer font for English,
+        // 20px for Malayalam (drawn as a bitmap, so the printer font doesn't apply).
+        usbDriver?.write(PrintCmd.SetSizechar(0, 0, 0, 1))
+        printLine(temple.trim().uppercase(), center = true, textSize = 20f)
+        usbDriver?.write(PrintCmd.SetSizechar(0, 0, 0, 0))
+        printCentredLines(templeAddress)
+        printCentredLines(templePlace)
 
-usbDriver?.write(PrintCmd.SetAlignment(0))
+        usbDriver?.write(PrintCmd.SetAlignment(0))
 
-usbDriver?.write(PrintCmd.PrintFeedline(1))
+        usbDriver?.write(PrintCmd.PrintFeedline(1))
 
-printLine("--------------------------------")
+        // Bill No / Date labels, then the values below them; bill number in bold.
+        printTwoColumn("Bill No", "Date")
+        printTwoColumnBoldLeft(billNo, date)
 
-    // Bill number in bold, date on the next line - together they don't fit in 32 chars.
-    usbDriver?.write(PrintCmd.SetBold(1))
-    printLine("Bill No: $billNo")
-    usbDriver?.write(PrintCmd.SetBold(0))
-    printLine(date)
+        divider()
 
-    printLine("--------------------------------")
+        for (item in items) {
+            val product = item["pooja"]?.toString() ?: ""
+            val qty = item["qty"]?.toString() ?: ""
+            val rate = formatAmount(item["rate"])
+            val amount = formatAmount(item["amount"])
 
-    for (item in items) {
+            // Product name on its own line, then quantity x rate and the line amount.
+            printLine(product)
+            printTwoColumn("$qty x $rate", amount)
 
-        val pooja =
-            item["pooja"]?.toString() ?: ""
-
-        val qty =
-            item["qty"]?.toString() ?: ""
-
-        val rate =
-            item["rate"]?.toString() ?: ""
-
-        val poojaDate =
-            item["date"]?.toString() ?: ""
-
-        val address =
-            item["address"]?.toString() ?: ""
-
-        // Print pooja name, quantity and rate
-        if (pooja.isNotEmpty()) {
-           printLine("$pooja  $qty x Rs.$rate")
-       }
-
-        if (poojaDate.isNotEmpty()) {
-           printLine(poojaDate)
+            usbDriver?.write(PrintCmd.PrintFeedline(1))
         }
 
-        if (address.isNotEmpty()) {
-           printLine(address)
-        }
+        divider()
 
-        usbDriver?.write(
-            PrintCmd.PrintFeedline(1)
+        printTwoColumn(
+            "Mode: $mode",
+            "Total: Rs.${formatTotal(total)}"
         )
+
+        usbDriver?.write(PrintCmd.PrintFeedline(4))
+
+        usbDriver?.write(PrintCmd.PrintCutpaper(0))
     }
-
-    printLine("--------------------------------")
-
-    printTwoColumn(
-        "Mode: $mode",
-        "Total: Rs.$total"
-    )
-
-    usbDriver?.write(
-        PrintCmd.PrintFeedline(4)
-    )
-
-    usbDriver?.write(
-        PrintCmd.PrintCutpaper(0)
-    )
-}
 
 }

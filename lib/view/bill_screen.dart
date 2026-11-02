@@ -889,6 +889,8 @@ import 'package:kiosk/responsive.dart';
 import 'package:kiosk/view/bill_summary_screen.dart';
 import 'package:kiosk/view/billpreview.dart';
 import 'package:kiosk/view/homepage.dart';
+import 'package:kiosk/view/loginscreen.dart' show LoginScreen;
+import 'package:kiosk/services/shared_preference_helper.dart';
 
 class BillScreen extends StatefulWidget {
   const BillScreen({super.key});
@@ -1014,7 +1016,7 @@ class _BillScreenState extends State<BillScreen> {
     });
 
     _beep.invokeMethod('success');
-    _snack('${product.name} added to bill');
+    _snack('${product.name} added to list');
   }
 
   double get _subtotal => _items.fold(0, (s, i) => s + i.lineTotal);
@@ -1027,7 +1029,7 @@ class _BillScreenState extends State<BillScreen> {
     final ok = await showConfirmDialog(
       context,
       title: 'Remove item?',
-      message: '${_items[index].product.name} will be removed from this bill.',
+      message: '${_items[index].product.name} will be removed from this list.',
       confirmLabel: 'Remove',
     );
     if (ok && mounted) setState(() => _items.removeAt(index));
@@ -1037,7 +1039,7 @@ class _BillScreenState extends State<BillScreen> {
     final ok = await showConfirmDialog(
       context,
       title: 'Clear all items?',
-      message: 'All products will be removed from this bill.',
+      message: 'All products will be removed from this list.',
       confirmLabel: 'Clear all',
     );
     if (ok && mounted) setState(_items.clear);
@@ -1103,17 +1105,60 @@ class _BillScreenState extends State<BillScreen> {
                   style: TextStyle(color: Colors.black, fontSize: 30.sp)),
             ],
           ),
-          SizedBox(
-            height: 70.h,
-            width: 250.w,
-            child: Image.asset(
-              "assets/images/bevco_logo.png",
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const SizedBox(),
+          // Tapping the logo opens a dropdown with Logout.
+          PopupMenuButton<String>(
+            tooltip: "",
+            offset: Offset(0, 80.h),
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20.r),
+            ),
+            onSelected: (value) {
+              if (value == "logout") _logout();
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem<String>(
+                value: "logout",
+                child: Row(
+                  children: [
+                    Icon(Icons.logout_rounded, color: _red, size: 36.w),
+                    12.horizontalSpace,
+                    Text(
+                      "LOGOUT",
+                      style: TextStyle(
+                        fontSize: 30.sp,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.black,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            child: SizedBox(
+              height: 70.h,
+              width: 250.w,
+              child: Image.asset(
+                "assets/images/bevco_logo.png",
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const SizedBox(),
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  // Same as the home screen logout; also drops the items in the cart.
+  void _logout() {
+    context.read<HomeProvider>().clearGrossAmount();
+    SharedPreferenceHelper.clearWholeData();
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+      (route) => false,
     );
   }
 
