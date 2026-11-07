@@ -1,4 +1,4 @@
-package com.example.punnyam_kiosk_kadampuzha
+package com.example.bevco_app
 
 import android.media.AudioManager
 import android.media.ToneGenerator

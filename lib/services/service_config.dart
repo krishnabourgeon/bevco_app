@@ -105,7 +105,7 @@ class ServiceConfig {
       var response = res.asValue!.value;
       debugPrint('-------------------product response $response------------------------');
       ProductModel productResponse = ProductModel.fromJson(response);
-      return (productResponse.status ?? false)
+      return (productResponse.status)
           ? Result.value(productResponse)
           : Result.error(productResponse);
     }
@@ -124,7 +124,7 @@ class ServiceConfig {
       var response = res.asValue!.value;
       debugPrint('pooja details response $response');
       PoojaDetailsModel poojaDetailResponse = PoojaDetailsModel.fromJson(response);
-      return (poojaDetailResponse.status ?? false)
+      return (poojaDetailResponse.status)
           ? Result.value(poojaDetailResponse)
           : Result.error(poojaDetailResponse);
     }

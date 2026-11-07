@@ -974,7 +974,6 @@ import 'package:kiosk/services/shared_preference_helper.dart';
 import 'package:kiosk/view/bill_screen.dart';
 import 'package:kiosk/view/loginscreen.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 const Color kBevcoRed = Color(0xFFE53238);
 const Color kBevcoRedLight = Color(0xFFFF5A5F);

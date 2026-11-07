@@ -1,4 +1,4 @@
-package com.example.punnyam_kiosk_kadampuzha
+package com.example.bevco_app
 
 import android.content.Context
 import android.graphics.Bitmap
